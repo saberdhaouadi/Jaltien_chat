@@ -160,6 +160,7 @@ function addLocal(stream){{
 }}
 
 function addRemote(name,stream){{
+  // ── Video tile ──
   let t=document.getElementById("tile-"+name);
   if(!t){{
     t=document.createElement("div");t.className="vid-tile";t.id="tile-"+name;
@@ -167,12 +168,32 @@ function addRemote(name,stream){{
     <div class="vid-label"><div class="dot"></div><span>${{info(name).avatar}} ${{name}}</span></div>`;
     document.getElementById("videos").appendChild(t);
   }}
-  document.getElementById("vid-"+name).srcObject=stream;
+  const vid=document.getElementById("vid-"+name);
+  vid.srcObject=stream;
+  vid.muted=true; // mute video element to prevent echo/double audio
+
+  // ── Dedicated <audio> element — this is what plays the voice ──
+  let aud=document.getElementById("aud-"+name);
+  if(!aud){{
+    aud=document.createElement("audio");
+    aud.id="aud-"+name;
+    aud.autoplay=true;
+    aud.muted=false;
+    aud.volume=1.0;
+    document.body.appendChild(aud);
+  }}
+  aud.srcObject=stream;
+  // Force play — required in some browsers inside iframes
+  aud.play().catch(()=>{{
+    document.addEventListener("click",()=>aud.play(),{{once:true}});
+  }});
+
   pillOnline(name,true);
 }}
 
 function removeTile(name){{
   const t=document.getElementById("tile-"+name);if(t)t.remove();
+  const a=document.getElementById("aud-"+name);if(a)a.remove();
   pillOnline(name,false);delete calls[name];
 }}
 
@@ -208,7 +229,7 @@ document.getElementById("btnJoin").onclick=async()=>{{
     ]}}
   }});
   peer.on("open",()=>{{
-    setStatus("✅ Connected as <b>"+ME+"</b>. Calling friends…");
+    setStatus("✅ Connected as <b>"+ME+"</b>. Calling friends… <span style='color:#f5a623'>🔊 If you can\'t hear audio, click anywhere on the page to unlock sound.</span>");
     ["btnJoin","btnLeave","btnMute","btnCam"].forEach((id,i)=>
       document.getElementById(id).style.display=i===0?"none":"");
     OTHERS.forEach(callPeer);
@@ -223,6 +244,8 @@ document.getElementById("btnLeave").onclick=()=>{{
   if(peer)peer.destroy();
   if(myStream)myStream.getTracks().forEach(t=>t.stop());
   document.getElementById("videos").innerHTML="";
+  // Remove all audio elements
+  USERS.forEach(u=>{{const a=document.getElementById("aud-"+u.name);if(a)a.remove();}});
   calls={{}};peer=null;myStream=null;
   USERS.forEach(u=>pillOnline(u.name,false));
   ["btnJoin","btnLeave","btnMute","btnCam"].forEach((id,i)=>
