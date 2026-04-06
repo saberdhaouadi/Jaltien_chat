@@ -1,6 +1,5 @@
 import streamlit as st
 import hashlib
-import json
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="FriendChat", page_icon="🎙️", layout="wide", initial_sidebar_state="collapsed")
@@ -17,11 +16,10 @@ USERS = {
 AVATARS = {"Alex":"🦁","Jordan":"🐺","Morgan":"🦊","Taylor":"🐻","Riley":"🦅"}
 COLORS  = {"Alex":"#5b8dee","Jordan":"#e85b8d","Morgan":"#3ecf8e","Taylor":"#f5a623","Riley":"#b45bee"}
 
-# ─── DAILY.CO ROOM URL ──────────────────────────────────────────────────────────
-# 1. Go to https://dashboard.daily.co  (free account)
-# 2. Create a room (e.g. "friendchat-room"), set it to public
-# 3. Paste the room URL below
-DAILY_ROOM_URL = "https://your-domain.daily.co/friendchat-room"
+# ─── ROOM NAME ──────────────────────────────────────────────────────────────────
+# This is your private room. Change it to something unique so strangers can't guess it.
+# Only people who know this name AND have your app password can join.
+ROOM_NAME = "FriendChat-MyPrivateRoom-2026-XK9"
 
 def verify(username, password):
     return USERS.get(username) == hashlib.sha256(password.encode()).hexdigest()
@@ -43,13 +41,13 @@ html,body,[data-testid="stAppViewContainer"]{background:var(--bg)!important;colo
 .stSelectbox>div>div{background:var(--card)!important;border:1px solid var(--border)!important;border-radius:10px!important;color:var(--text)!important;}
 div[data-testid="stButton"]>button{background:var(--accent)!important;color:#fff!important;border:none!important;border-radius:10px!important;font-family:'Syne',sans-serif!important;font-weight:700!important;font-size:15px!important;padding:10px 28px!important;width:100%;transition:opacity .2s;}
 div[data-testid="stButton"]>button:hover{opacity:.85!important;}
-iframe{border:none!important;}
+iframe{border:none!important;border-radius:16px!important;}
 </style>
 """, unsafe_allow_html=True)
 
 # ════════════════ LOGIN ══════════════════════════════════════════════════════════
 if not st.session_state.logged_in:
-    c1, c2, c3 = st.columns([1,1.1,1])
+    c1, c2, c3 = st.columns([1, 1.1, 1])
     with c2:
         st.markdown("""
         <div style="text-align:center;padding:40px 0 8px">
@@ -93,129 +91,117 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Daily.co embed — the only reliable cross-browser WebRTC in an iframe ─────────
-# Daily handles camera, mic, audio routing, echo cancellation, TURN servers, all of it.
-DAILY_HTML = f"""
-<!DOCTYPE html>
+# ── Jitsi Meet embed ─────────────────────────────────────────────────────────────
+# Jitsi is 100% free, open-source, no account needed, handles all WebRTC properly.
+# The External API gives full control: display name, avatar color, start muted, etc.
+
+JITSI_HTML = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
-  body {{ background:#0d0f14; font-family:'Segoe UI',sans-serif; overflow:hidden; }}
-  #frame {{ width:100vw; height:100vh; border:none; display:block; }}
+  body {{ background:#0d0f14; overflow:hidden; font-family:'Segoe UI',sans-serif; }}
+
   #splash {{
     position:fixed; inset:0; background:#0d0f14;
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
   }}
-  #splash p {{
-    color:#6b7194; font-size:13px; font-family:monospace; text-align:center; line-height:1.7;
-    max-width:340px;
-  }}
-  #joinBtn {{
-    background:#5b8dee; color:#fff; border:none; border-radius:12px;
-    padding:13px 32px; font-size:15px; font-weight:700; cursor:pointer;
-    font-family:inherit; transition:opacity .2s;
-  }}
-  #joinBtn:hover {{ opacity:.85; }}
-  .name-badge {{
+  .badge {{
     background:#1d2130; border:1px solid #2a2f45; border-radius:50px;
-    padding:6px 16px; font-size:13px; font-family:monospace; color:#e8eaf6;
+    padding:7px 18px; font-size:13px; font-family:monospace; color:#e8eaf6;
     display:flex; align-items:center; gap:8px;
   }}
-  .dot {{ width:8px; height:8px; background:#3ecf8e; border-radius:50%; box-shadow:0 0 6px #3ecf8e; }}
+  .live-dot {{ width:8px;height:8px;background:#3ecf8e;border-radius:50%;box-shadow:0 0 6px #3ecf8e; }}
+  #joinBtn {{
+    background:{color}; color:#fff; border:none; border-radius:12px;
+    padding:13px 36px; font-size:15px; font-weight:700; cursor:pointer;
+    font-family:inherit; letter-spacing:0.3px; transition:opacity .2s;
+  }}
+  #joinBtn:hover {{ opacity:.85; }}
+  .hint {{ color:#3a3f58; font-size:12px; font-family:monospace; text-align:center; line-height:1.8; }}
+  #meet {{ position:fixed; inset:0; display:none; }}
 </style>
-<script src="https://unpkg.com/@daily-co/daily-js"></script>
+<script src="https://meet.jit.si/external_api.js"></script>
 </head>
 <body>
 
 <div id="splash">
-  <div style="font-size:48px">🎙️</div>
-  <div class="name-badge">
-    <div class="dot"></div>
-    <span>{avatar} {ME}</span>
-  </div>
-  <p>
-    Click <strong style="color:#e8eaf6">Join Call</strong> to enter the video room.<br>
-    Your browser will ask for camera &amp; microphone — please allow both.
-  </p>
+  <div style="font-size:46px">{avatar}</div>
+  <div style="font-size:22px;font-weight:800;color:#e8eaf6">{ME}</div>
+  <div class="badge"><div class="live-dot"></div><span>Room ready · {ROOM_NAME[:24]}…</span></div>
   <button id="joinBtn">📹 Join Call</button>
-  <p style="font-size:11px;color:#3a3f58">
-    Friends using the same app will appear automatically once they also join.
-  </p>
+  <div class="hint">
+    Your browser will ask for camera &amp; microphone access — allow both.<br>
+    All 5 friends join the same private room automatically.
+  </div>
 </div>
 
-<iframe id="frame" style="display:none" allow="camera; microphone; autoplay; display-capture; speaker-selection; clipboard-write"></iframe>
+<div id="meet"></div>
 
 <script>
-  document.getElementById("joinBtn").onclick = function() {{
-    const roomUrl = "{DAILY_ROOM_URL}";
-    
-    // Check if Daily.co room URL is configured
-    if (roomUrl.includes("your-domain")) {{
-      document.getElementById("splash").innerHTML = `
-        <div style="color:#e85b8d;font-size:14px;font-family:monospace;text-align:center;padding:20px;max-width:400px;line-height:1.8">
-          ⚠️ <strong style="color:#e8eaf6">Room not configured yet!</strong><br><br>
-          1. Go to <a href="https://dashboard.daily.co" target="_blank" style="color:#5b8dee">dashboard.daily.co</a> (free)<br>
-          2. Create a room named <code style="background:#1d2130;padding:2px 6px;border-radius:4px">friendchat-room</code><br>
-          3. Copy the room URL and paste it into <code style="background:#1d2130;padding:2px 6px;border-radius:4px">DAILY_ROOM_URL</code> in app.py<br>
-          4. Redeploy the app
-        </div>`;
-      return;
-    }}
+window.addEventListener("load", function() {{
+  document.getElementById("joinBtn").addEventListener("click", function() {{
+    document.getElementById("splash").style.display = "none";
+    document.getElementById("meet").style.display   = "block";
 
-    // Use Daily.co's embedded call UI — handles everything (video, audio, echo cancellation)
-    const callFrame = window.DailyIframe.createFrame(
-      document.getElementById("frame"),
-      {{
-        iframeStyle: {{
-          width: "100%",
-          height: "100%",
-          border: "none",
-        }},
-        showLeaveButton: true,
-        showFullscreenButton: true,
-      }}
-    );
+    const api = new JitsiMeetExternalAPI("meet.jit.si", {{
+      roomName: "{ROOM_NAME}",
+      parentNode: document.getElementById("meet"),
+      displayName: "{ME} {avatar}",
+      userInfo: {{
+        displayName: "{ME} {avatar}",
+      }},
+      configOverwrite: {{
+        startWithAudioMuted:    false,
+        startWithVideoMuted:    false,
+        prejoinPageEnabled:     false,
+        disableDeepLinking:     true,
+        enableWelcomePage:      false,
+        disableInviteFunctions: true,
+        toolbarButtons: [
+          "microphone", "camera", "desktop", "fullscreen",
+          "fodeviceselection", "hangup", "chat",
+          "tileview", "select-background", "toggle-camera",
+        ],
+      }},
+      interfaceConfigOverwrite: {{
+        SHOW_JITSI_WATERMARK:       false,
+        SHOW_WATERMARK_FOR_GUESTS:  false,
+        SHOW_BRAND_WATERMARK:       false,
+        SHOW_POWERED_BY:            false,
+        DISPLAY_WELCOME_PAGE_CONTENT: false,
+        HIDE_INVITE_MORE_HEADER:    true,
+        MOBILE_APP_PROMO:           false,
+        APP_NAME:                   "FriendChat",
+        NATIVE_APP_NAME:            "FriendChat",
+        TOOLBAR_ALWAYS_VISIBLE:     false,
+      }},
+    }});
 
-    callFrame
-      .join({{
-        url: roomUrl,
-        userName: "{ME} {avatar}",
-        startVideoOff: false,
-        startAudioOff: false,
-      }})
-      .then(() => {{
-        document.getElementById("splash").style.display = "none";
-        document.getElementById("frame").style.display  = "block";
-      }})
-      .catch(err => {{
-        document.getElementById("splash").innerHTML += 
-          `<p style="color:#e85b8d">Error joining: ${{err.message}}</p>`;
-      }});
-
-    callFrame.on("left-meeting", () => {{
-      document.getElementById("frame").style.display  = "none";
+    api.addEventListener("readyToClose", function() {{
+      api.dispose();
+      document.getElementById("meet").style.display   = "none";
       document.getElementById("splash").style.display = "flex";
     }});
-  }};
+  }});
+}});
 </script>
 </body>
-</html>
-"""
+</html>"""
 
-components.html(DAILY_HTML, height=620, scrolling=False)
+components.html(JITSI_HTML, height=650, scrolling=False)
 
 # Logout
 st.markdown("---")
-ca, cb, cc = st.columns([4,1,4])
+ca, cb, cc = st.columns([4, 1, 4])
 with cb:
     st.markdown("""<style>
-    div[data-testid='stButton']>button{
+    div[data-testid='stButton']>button{{
       background:#1d2130!important;border:1px solid #2a2f45!important;
       color:#6b7194!important;font-size:12px!important;
       width:auto!important;padding:6px 18px!important;
-    }</style>""", unsafe_allow_html=True)
+    }}</style>""", unsafe_allow_html=True)
     if st.button("Sign out"):
         st.session_state.logged_in = False
         st.session_state.username  = ""
