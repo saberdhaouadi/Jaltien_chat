@@ -3,15 +3,10 @@ import hashlib
 import json
 import streamlit.components.v1 as components
 
-# ─── PAGE CONFIG ────────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="FriendChat",
-    page_icon="🎙️",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
+st.set_page_config(page_title="FriendChat", page_icon="🎙️", layout="wide", initial_sidebar_state="collapsed")
 
 # ─── USERS CONFIG ───────────────────────────────────────────────────────────────
+# Change names and passwords before deploying!
 USERS = {
     "Alex":   hashlib.sha256("alex123".encode()).hexdigest(),
     "Jordan": hashlib.sha256("jordan456".encode()).hexdigest(),
@@ -22,10 +17,15 @@ USERS = {
 AVATARS = {"Alex":"🦁","Jordan":"🐺","Morgan":"🦊","Taylor":"🐻","Riley":"🦅"}
 COLORS  = {"Alex":"#5b8dee","Jordan":"#e85b8d","Morgan":"#3ecf8e","Taylor":"#f5a623","Riley":"#b45bee"}
 
+# ─── DAILY.CO ROOM URL ──────────────────────────────────────────────────────────
+# 1. Go to https://dashboard.daily.co  (free account)
+# 2. Create a room (e.g. "friendchat-room"), set it to public
+# 3. Paste the room URL below
+DAILY_ROOM_URL = "https://your-domain.daily.co/friendchat-room"
+
 def verify(username, password):
     return USERS.get(username) == hashlib.sha256(password.encode()).hexdigest()
 
-# ─── SESSION STATE ───────────────────────────────────────────────────────────────
 for k, v in [("logged_in", False), ("username", ""), ("login_error", "")]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -47,9 +47,7 @@ iframe{border:none!important;}
 </style>
 """, unsafe_allow_html=True)
 
-# ════════════════════════════════════════════════════════════════════════════════
-# LOGIN
-# ════════════════════════════════════════════════════════════════════════════════
+# ════════════════ LOGIN ══════════════════════════════════════════════════════════
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1,1.1,1])
     with c2:
@@ -57,7 +55,9 @@ if not st.session_state.logged_in:
         <div style="text-align:center;padding:40px 0 8px">
           <div style="font-size:54px">🎙️</div>
           <div style="font-size:30px;font-weight:800;letter-spacing:-0.5px">FriendChat</div>
-          <div style="font-size:13px;color:#6b7194;font-family:'DM Mono',monospace;margin-bottom:28px">private video &amp; voice · up to 5 friends</div>
+          <div style="font-size:13px;color:#6b7194;font-family:'DM Mono',monospace;margin-bottom:28px">
+            private video &amp; voice · up to 5 friends
+          </div>
         </div>""", unsafe_allow_html=True)
         username = st.selectbox("Your name", [""] + list(USERS.keys()),
                                 format_func=lambda x: f"{AVATARS.get(x,'')} {x}" if x else "— pick your name —")
@@ -75,202 +75,147 @@ if not st.session_state.logged_in:
                 st.rerun()
     st.stop()
 
-# ════════════════════════════════════════════════════════════════════════════════
-# MAIN APP
-# ════════════════════════════════════════════════════════════════════════════════
+# ════════════════ MAIN APP ═══════════════════════════════════════════════════════
 ME     = st.session_state.username
 avatar = AVATARS.get(ME, "👤")
 color  = COLORS.get(ME, "#5b8dee")
-users_json = json.dumps([{"name": n, "avatar": a, "color": COLORS.get(n,"#5b8dee")} for n, a in AVATARS.items()])
 
+# Top bar
 st.markdown(f"""
 <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;
-            background:#161922;border-bottom:1px solid #2a2f45;border-radius:0 0 16px 16px;margin-bottom:20px">
+  background:#161922;border-bottom:1px solid #2a2f45;border-radius:0 0 16px 16px;margin-bottom:20px">
   <div style="font-size:20px;font-weight:800">Friend<span style="color:#5b8dee">Chat</span> 🎙️</div>
   <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#6b7194;font-family:'DM Mono',monospace">
     <span>{ME}</span>
-    <div style="font-size:20px;width:36px;height:36px;background:#1d2130;border:1px solid #2a2f45;
-                border-radius:50%;display:flex;align-items:center;justify-content:center">{avatar}</div>
+    <div style="font-size:22px;width:38px;height:38px;background:#1d2130;border:1px solid #2a2f45;
+      border-radius:50%;display:flex;align-items:center;justify-content:center">{avatar}</div>
   </div>
-</div>""", unsafe_allow_html=True)
-
-# Build friend pills HTML
-pills = "".join(
-    f'<div class="fpill" id="pill-{u["name"]}">'
-    f'<span>{u["avatar"]}</span><div class="fdot"></div><span>{u["name"]}</span></div>'
-    for u in json.loads(users_json)
-)
-
-HTML = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{background:#0d0f14;font-family:'Segoe UI',sans-serif;color:#e8eaf6;padding:16px;}}
-#status{{font-size:12px;font-family:monospace;color:#6b7194;margin-bottom:14px;padding:10px 14px;
-         background:#1d2130;border-radius:10px;border-left:3px solid #5b8dee;line-height:1.5}}
-#controls{{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}}
-button{{border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .2s;font-family:inherit}}
-button:hover{{opacity:.85}}
-#btnJoin{{background:#5b8dee;color:#fff}}
-#btnLeave,#btnMute,#btnCam{{background:#2a2f45;color:#e8eaf6;display:none}}
-#videos{{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}}
-.vid-tile{{position:relative;background:#161922;border:1px solid #2a2f45;border-radius:14px;overflow:hidden;aspect-ratio:4/3}}
-.vid-tile video{{width:100%;height:100%;object-fit:cover;display:block}}
-.vid-label{{position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,.6);border-radius:20px;
-            padding:3px 10px 3px 6px;font-size:12px;display:flex;align-items:center;gap:5px;backdrop-filter:blur(4px)}}
-.dot{{width:7px;height:7px;background:#3ecf8e;border-radius:50%;box-shadow:0 0 5px #3ecf8e}}
-#friends-bar{{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}}
-.fpill{{display:flex;align-items:center;gap:6px;background:#1d2130;border:1px solid #2a2f45;
-        border-radius:50px;padding:4px 12px 4px 8px;font-size:12px;font-family:monospace;transition:border-color .3s}}
-.fpill.online{{border-color:#3ecf8e}}
-.fdot{{width:7px;height:7px;border-radius:50%;background:#3a3f58;transition:background .3s,box-shadow .3s}}
-.fpill.online .fdot{{background:#3ecf8e;box-shadow:0 0 5px #3ecf8e}}
-</style>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-</head><body>
-<div id="friends-bar">{pills}</div>
-<div id="status">Click <b>Join Call</b> to share your camera &amp; microphone with friends.</div>
-<div id="controls">
-  <button id="btnJoin">📹 Join Call</button>
-  <button id="btnLeave">📴 Leave</button>
-  <button id="btnMute">🎙️ Mute</button>
-  <button id="btnCam">📷 Hide Cam</button>
 </div>
-<div id="videos"></div>
+""", unsafe_allow_html=True)
+
+# ── Daily.co embed — the only reliable cross-browser WebRTC in an iframe ─────────
+# Daily handles camera, mic, audio routing, echo cancellation, TURN servers, all of it.
+DAILY_HTML = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  body {{ background:#0d0f14; font-family:'Segoe UI',sans-serif; overflow:hidden; }}
+  #frame {{ width:100vw; height:100vh; border:none; display:block; }}
+  #splash {{
+    position:fixed; inset:0; background:#0d0f14;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;
+  }}
+  #splash p {{
+    color:#6b7194; font-size:13px; font-family:monospace; text-align:center; line-height:1.7;
+    max-width:340px;
+  }}
+  #joinBtn {{
+    background:#5b8dee; color:#fff; border:none; border-radius:12px;
+    padding:13px 32px; font-size:15px; font-weight:700; cursor:pointer;
+    font-family:inherit; transition:opacity .2s;
+  }}
+  #joinBtn:hover {{ opacity:.85; }}
+  .name-badge {{
+    background:#1d2130; border:1px solid #2a2f45; border-radius:50px;
+    padding:6px 16px; font-size:13px; font-family:monospace; color:#e8eaf6;
+    display:flex; align-items:center; gap:8px;
+  }}
+  .dot {{ width:8px; height:8px; background:#3ecf8e; border-radius:50%; box-shadow:0 0 6px #3ecf8e; }}
+</style>
+<script src="https://unpkg.com/@daily-co/daily-js"></script>
+</head>
+<body>
+
+<div id="splash">
+  <div style="font-size:48px">🎙️</div>
+  <div class="name-badge">
+    <div class="dot"></div>
+    <span>{avatar} {ME}</span>
+  </div>
+  <p>
+    Click <strong style="color:#e8eaf6">Join Call</strong> to enter the video room.<br>
+    Your browser will ask for camera &amp; microphone — please allow both.
+  </p>
+  <button id="joinBtn">📹 Join Call</button>
+  <p style="font-size:11px;color:#3a3f58">
+    Friends using the same app will appear automatically once they also join.
+  </p>
+</div>
+
+<iframe id="frame" style="display:none" allow="camera; microphone; autoplay; display-capture; speaker-selection; clipboard-write"></iframe>
+
 <script>
-const ME={json.dumps(ME)};
-const USERS={users_json};
-const ROOM="friendchat-v1-2026";
-const myId=ROOM+"-"+ME;
-const OTHERS=USERS.map(u=>u.name).filter(n=>n!==ME);
-let peer=null,myStream=null,calls={{}},muted=false,camOff=false;
+  document.getElementById("joinBtn").onclick = function() {{
+    const roomUrl = "{DAILY_ROOM_URL}";
+    
+    // Check if Daily.co room URL is configured
+    if (roomUrl.includes("your-domain")) {{
+      document.getElementById("splash").innerHTML = `
+        <div style="color:#e85b8d;font-size:14px;font-family:monospace;text-align:center;padding:20px;max-width:400px;line-height:1.8">
+          ⚠️ <strong style="color:#e8eaf6">Room not configured yet!</strong><br><br>
+          1. Go to <a href="https://dashboard.daily.co" target="_blank" style="color:#5b8dee">dashboard.daily.co</a> (free)<br>
+          2. Create a room named <code style="background:#1d2130;padding:2px 6px;border-radius:4px">friendchat-room</code><br>
+          3. Copy the room URL and paste it into <code style="background:#1d2130;padding:2px 6px;border-radius:4px">DAILY_ROOM_URL</code> in app.py<br>
+          4. Redeploy the app
+        </div>`;
+      return;
+    }}
 
-function info(n){{return USERS.find(u=>u.name===n)||{{name:n,avatar:"👤",color:"#5b8dee"}}}}
-function setStatus(m){{document.getElementById("status").innerHTML=m}}
-function pillOnline(n,on){{const p=document.getElementById("pill-"+n);if(!p)return;on?p.classList.add("online"):p.classList.remove("online")}}
+    // Use Daily.co's embedded call UI — handles everything (video, audio, echo cancellation)
+    const callFrame = window.DailyIframe.createFrame(
+      document.getElementById("frame"),
+      {{
+        iframeStyle: {{
+          width: "100%",
+          height: "100%",
+          border: "none",
+        }},
+        showLeaveButton: true,
+        showFullscreenButton: true,
+      }}
+    );
 
-function addLocal(stream){{
-  let t=document.getElementById("tile-local");
-  if(!t){{
-    t=document.createElement("div");t.className="vid-tile";t.id="tile-local";
-    t.innerHTML=`<video id="vid-local" autoplay muted playsinline></video>
-    <div class="vid-label"><div class="dot"></div><span>${{info(ME).avatar}} ${{ME}} (you)</span></div>`;
-    document.getElementById("videos").prepend(t);
-  }}
-  document.getElementById("vid-local").srcObject=stream;
-}}
+    callFrame
+      .join({{
+        url: roomUrl,
+        userName: "{ME} {avatar}",
+        startVideoOff: false,
+        startAudioOff: false,
+      }})
+      .then(() => {{
+        document.getElementById("splash").style.display = "none";
+        document.getElementById("frame").style.display  = "block";
+      }})
+      .catch(err => {{
+        document.getElementById("splash").innerHTML += 
+          `<p style="color:#e85b8d">Error joining: ${{err.message}}</p>`;
+      }});
 
-function addRemote(name,stream){{
-  // ── Video tile ──
-  let t=document.getElementById("tile-"+name);
-  if(!t){{
-    t=document.createElement("div");t.className="vid-tile";t.id="tile-"+name;
-    t.innerHTML=`<video id="vid-${{name}}" autoplay playsinline></video>
-    <div class="vid-label"><div class="dot"></div><span>${{info(name).avatar}} ${{name}}</span></div>`;
-    document.getElementById("videos").appendChild(t);
-  }}
-  const vid=document.getElementById("vid-"+name);
-  vid.srcObject=stream;
-  vid.muted=true; // mute video element to prevent echo/double audio
+    callFrame.on("left-meeting", () => {{
+      document.getElementById("frame").style.display  = "none";
+      document.getElementById("splash").style.display = "flex";
+    }});
+  }};
+</script>
+</body>
+</html>
+"""
 
-  // ── Dedicated <audio> element — this is what plays the voice ──
-  let aud=document.getElementById("aud-"+name);
-  if(!aud){{
-    aud=document.createElement("audio");
-    aud.id="aud-"+name;
-    aud.autoplay=true;
-    aud.muted=false;
-    aud.volume=1.0;
-    document.body.appendChild(aud);
-  }}
-  aud.srcObject=stream;
-  // Force play — required in some browsers inside iframes
-  aud.play().catch(()=>{{
-    document.addEventListener("click",()=>aud.play(),{{once:true}});
-  }});
+components.html(DAILY_HTML, height=620, scrolling=False)
 
-  pillOnline(name,true);
-}}
-
-function removeTile(name){{
-  const t=document.getElementById("tile-"+name);if(t)t.remove();
-  const a=document.getElementById("aud-"+name);if(a)a.remove();
-  pillOnline(name,false);delete calls[name];
-}}
-
-function handleCall(call){{
-  const caller=call.peer.replace(ROOM+"-","");
-  call.answer(myStream);
-  call.on("stream",s=>addRemote(caller,s));
-  call.on("close",()=>removeTile(caller));
-  call.on("error",()=>removeTile(caller));
-  calls[caller]=call;
-}}
-
-function callPeer(name){{
-  if(calls[name])return;
-  const c=peer.call(ROOM+"-"+name,myStream);if(!c)return;
-  c.on("stream",s=>addRemote(name,s));
-  c.on("close",()=>removeTile(name));
-  c.on("error",()=>removeTile(name));
-  calls[name]=c;
-}}
-
-document.getElementById("btnJoin").onclick=async()=>{{
-  setStatus("🎤 Requesting camera &amp; microphone…");
-  try{{myStream=await navigator.mediaDevices.getUserMedia({{video:true,audio:true}})}}
-  catch(e){{setStatus("❌ Camera/mic blocked. Please allow access and reload the page.");return}}
-  addLocal(myStream);pillOnline(ME,true);
-  peer=new Peer(myId,{{
-    host:"0.peerjs.com",port:443,path:"/",secure:true,
-    config:{{iceServers:[
-      {{urls:"stun:stun.l.google.com:19302"}},
-      {{urls:"stun:stun1.l.google.com:19302"}},
-      {{urls:"turn:openrelay.metered.ca:80",username:"openrelayproject",credential:"openrelayproject"}}
-    ]}}
-  }});
-  peer.on("open",()=>{{
-    setStatus("✅ Connected as <b>"+ME+"</b>. Calling friends… <span style='color:#f5a623'>🔊 If you can\'t hear audio, click anywhere on the page to unlock sound.</span>");
-    ["btnJoin","btnLeave","btnMute","btnCam"].forEach((id,i)=>
-      document.getElementById(id).style.display=i===0?"none":"");
-    OTHERS.forEach(callPeer);
-    setInterval(()=>OTHERS.forEach(callPeer),4000);
-  }});
-  peer.on("call",handleCall);
-  peer.on("error",e=>{{if(e.type==="peer-unavailable")return;setStatus("⚠️ "+e.message)}});
-}};
-
-document.getElementById("btnLeave").onclick=()=>{{
-  Object.values(calls).forEach(c=>c.close());
-  if(peer)peer.destroy();
-  if(myStream)myStream.getTracks().forEach(t=>t.stop());
-  document.getElementById("videos").innerHTML="";
-  // Remove all audio elements
-  USERS.forEach(u=>{{const a=document.getElementById("aud-"+u.name);if(a)a.remove();}});
-  calls={{}};peer=null;myStream=null;
-  USERS.forEach(u=>pillOnline(u.name,false));
-  ["btnJoin","btnLeave","btnMute","btnCam"].forEach((id,i)=>
-    document.getElementById(id).style.display=i===0?"":"none");
-  setStatus("You left. Click <b>Join Call</b> to reconnect.");
-}};
-
-document.getElementById("btnMute").onclick=()=>{{
-  if(!myStream)return;muted=!muted;
-  myStream.getAudioTracks().forEach(t=>t.enabled=!muted);
-  document.getElementById("btnMute").textContent=muted?"🔇 Unmute":"🎙️ Mute";
-}};
-document.getElementById("btnCam").onclick=()=>{{
-  if(!myStream)return;camOff=!camOff;
-  myStream.getVideoTracks().forEach(t=>t.enabled=!camOff);
-  document.getElementById("btnCam").textContent=camOff?"📷 Show Cam":"📷 Hide Cam";
-}};
-</script></body></html>"""
-
-components.html(HTML, height=700, scrolling=True)
-
+# Logout
 st.markdown("---")
 ca, cb, cc = st.columns([4,1,4])
 with cb:
-    st.markdown("<style>div[data-testid='stButton']>button{background:#1d2130!important;border:1px solid #2a2f45!important;color:#6b7194!important;font-size:12px!important;width:auto!important;padding:6px 18px!important;}</style>", unsafe_allow_html=True)
+    st.markdown("""<style>
+    div[data-testid='stButton']>button{
+      background:#1d2130!important;border:1px solid #2a2f45!important;
+      color:#6b7194!important;font-size:12px!important;
+      width:auto!important;padding:6px 18px!important;
+    }</style>""", unsafe_allow_html=True)
     if st.button("Sign out"):
         st.session_state.logged_in = False
         st.session_state.username  = ""
